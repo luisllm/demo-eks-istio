@@ -65,7 +65,7 @@ module "eks" {
 
   node_security_group_additional_rules = {
     ingress_nodes_karpenter_port = {
-      description                   = "Cluster API to Node group for Karpenter webhook"
+      description                   = "Cluster API to Node group for Istio"
       protocol                      = "tcp"
       from_port                     = 3000
       to_port                       = 20001
