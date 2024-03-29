@@ -63,6 +63,17 @@ module "eks" {
     }
   }
 
+  node_security_group_additional_rules = {
+    ingress_nodes_karpenter_port = {
+      description                   = "Cluster API to Node group for Karpenter webhook"
+      protocol                      = "tcp"
+      from_port                     = 3000
+      to_port                       = 20001
+      type                          = "ingress"
+      source_cluster_security_group = true
+    }
+  }
+
   tags = local.commontags
 }
 
