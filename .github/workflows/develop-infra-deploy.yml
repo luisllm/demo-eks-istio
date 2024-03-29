@@ -1,0 +1,120 @@
+name: "develop - Deploy infra"
+
+on:
+  pull_request:
+    branches:
+      - develop
+    types: [opened, synchronize]
+    paths-ignore:
+      - 'README.md'
+  workflow_dispatch:
+    branches:
+      - develop
+
+permissions:
+  contents: read
+  pull-requests: write
+  #issues: write
+
+env:
+  # Possible values: https://developer.hashicorp.com/terraform/internals/debugging
+  TF_LOG: INFO
+  # Credentials for deployment to AWS
+  AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+  AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+  # S3 bucket for the Terraform state
+  S3_BUCKET_TF_STATE: "develop-test-llm-terraform-state"
+  TF_STATE_FILE: "vpc-eks.tfstate"
+  AWS_REGION: "us-east-1"
+  TERRAFORM_VERSION: "1.7.0"
+  ENVIRONMENT: develop
+  EKS_CLUSTER_NAME: develop-eks-cluster
+
+
+jobs:
+  # Deploy the VPC and the EKS cluster
+  deploy_vpc_and_eks:
+    name: "Deploy VPC and EKS cluster"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    defaults:
+      run:
+        working-directory: terraform-code/vpc-eks
+    outputs:
+      tfplanExitCode: ${{ steps.tf-plan.outputs.exitcode }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: $TERRAFORM_VERSION
+      
+      - name: Install checkov
+        run: pip install checkov    
+
+      - name: Terraform Format
+        run: terraform fmt
+
+      - name: Terraform Init
+        run: |
+          terraform init \
+            -backend-config "bucket=$S3_BUCKET_TF_STATE" \
+            -backend-config "key=$TF_STATE_FILE"
+
+      - name: Terraform Validate
+        run: terraform validate -no-color
+
+      - name: Fetch variable file infra.tfvars from CONFIG REPO
+        uses: actions/checkout@v2
+        with:
+          repository: "luisllm/environments"
+          ref: develop # or specify the branch, tag, or commit hash where the file resides
+          path: "./environments"
+      
+      - name: Print variable file infra.tfvars coming from CONFIG REPO
+        run: cat ../../environments/tf-config/infra.tfvars
+         
+      # Generates an execution plan for Terraform
+      # An exit code of 0 indicated no changes, 1 a terraform failure, 2 there are pending changes.
+      - name: Terraform Plan
+        id: tf-plan
+        run: |
+          export exitcode=0
+          terraform plan -var-file="../../environments/tf-config/infra.tfvars" -detailed-exitcode -no-color -out tfplan || export exitcode=$?
+
+          echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
+          if [ $exitcode -eq 1 ]; then
+            echo Terraform Plan Failed!
+            exit 1
+          else 
+            exit 0
+          fi
+
+      - name: Run checkov
+        run: checkov -d . --quiet --soft-fail
+
+      # Terraform Apply
+      - name: Terraform Apply
+        run: terraform apply -auto-approve tfplan
+
+      # Notify to Slack channel if it fails
+      #- name: Notify slack fail
+      #    if: failure()
+      #    env:
+      #      SLACK_BOT_TOKEN: ${{ secrets.SLACK_NOTIFICATIONS_BOT_TOKEN }}
+      #    uses: voxmedia/github-action-slack-notify-build@v1
+      #    with:
+      #      channel: app-alerts
+      #      status: FAILED
+      #      color: danger
+
+
