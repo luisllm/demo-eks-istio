@@ -232,6 +232,7 @@ jobs:
       # https://artifacthub.io/packages/helm/istio-official/gateway
       - name: Deploy istio ingress gateway
         run: |
+          kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
           helm upgrade --install istio-ingress istio/gateway \
             --version $ISTIO_CHART_VERSION \
             -n istio-ingress \
