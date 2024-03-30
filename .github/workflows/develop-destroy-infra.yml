@@ -21,6 +21,29 @@ env:
   TEST_NAMESPACE: "demo-test"
 
 jobs:
+  destroy_istio:
+    name: "Delete Istio"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+      - name: Update kube config
+        run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+      - name: Destroy Istio
+        run: |
+          helm -n istio-ingress uninstall istio-ingress
+          helm -n istio-system uninstall istiod
+          helm -n istio-system uninstall istio-base
+
+          
+
   destroy_eks_and_vpc:
     name: "Delete the EKS cluster and VPC"
     runs-on: ubuntu-latest
