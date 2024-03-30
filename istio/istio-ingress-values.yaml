@@ -31,3 +31,7 @@ service:
     #https://dev.to/aws-builders/creating-network-load-balancer-sg-supported-with-aws-load-balancer-controller-168p
     service.beta.kubernetes.io/aws-load-balancer-security-groups: PUBLIC_SG_ID_CHANGEME
     service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
+
+labels:
+  app: ingressgateway
+  istio: ingressgateway
