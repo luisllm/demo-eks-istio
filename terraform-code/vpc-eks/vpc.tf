@@ -20,3 +20,12 @@ module "vpc" {
     local.commontags
   )
 }
+
+
+resource "aws_ssm_parameter" "public_subnets" {
+  name        = "/${local.system_name}/public-subnets"
+  description = "ParameterStore param with list of public subnets"
+  type        = "String"
+  value       = module.vpc.public_subnets
+  depends_on  = [module.vpc]
+}

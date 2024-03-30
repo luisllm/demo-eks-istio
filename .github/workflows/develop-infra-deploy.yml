@@ -194,10 +194,21 @@ jobs:
       # Get from AWS ParameterStore the SecGroup ID that should be attached to the public AWS LB
       # The SecGroup was created by Terraform
       - name: Get SecGroup from ParameterStore
-        id: discover-lb-secgroup
         run: |
           secgroup_id=$(aws ssm get-parameter --name "/$ENVIRONMENT/public-lb-secgroup-id" --query 'Parameter.Value' --output text)
           echo "SECGROUP_ID=$secgroup_id" >>$GITHUB_ENV
+
+      # Get from AWS ParameterStore the list of public subnets
+      - name: Get public subnets from ParameterStore
+        run: |
+          public_subnets=$(aws ssm get-parameter --name "/$ENVIRONMENT/public-subnets" --query 'Parameter.Value' --output text)
+          echo "PUBLIC_SUBNETS=$public_subnets" >>$GITHUB_ENV
+
+      - name: Customize values file
+        run: |       
+          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" istio-ingress-values.yaml > istio-ingress-values-replaced.yaml
+          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" istio-ingress-values-replaced.yaml > istio-ingress-values-replaced.yaml
+          cat istio-ingress-values-replaced.yaml
 
       - name: Update kube config
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
@@ -224,18 +235,9 @@ jobs:
           helm upgrade --install istio-ingress istio/gateway \
             --version $ISTIO_CHART_VERSION \
             -n istio-ingress \
-            --values istio-ingress-values.yaml
-
-      #    kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
-      #    helm upgrade --install istio-ingress istio/gateway --version $ISTIO_CHART_VERSION -n istio-ingress --values ingress-values.yaml
+            --values istio-ingress-values-replaced.yaml
 
 
-
-          #helm upgrade --install public-ingress \
-          #  oci://ghcr.io/nginxinc/charts/nginx-ingress \
-          #  --version $NGINX_INGRESS_CONTROLLER_CHART_VERSION \
-          #  --namespace public-ingress \
-          #  --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-security-groups"="$SECGROUP_ID"
 
 
 

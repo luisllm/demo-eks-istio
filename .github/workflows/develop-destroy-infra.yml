@@ -42,13 +42,13 @@ jobs:
           helm -n istio-system uninstall istiod
           helm -n istio-system uninstall istio-base
 
-          
+
 
   destroy_eks_and_vpc:
     name: "Delete the EKS cluster and VPC"
     runs-on: ubuntu-latest
     #environment: $ENVIRONMENT
-    #needs: [destroy_s3bucket, destroy_public_ingress, destroy_public_lb_aws_parameterstore, destroy_monitoring]
+    needs: [destroy_istio]
     defaults:
       run:
         working-directory: terraform-code/vpc-eks
