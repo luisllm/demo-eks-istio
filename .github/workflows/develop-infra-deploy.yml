@@ -29,6 +29,7 @@ env:
   TERRAFORM_VERSION: "1.7.0"
   ENVIRONMENT: develop
   EKS_CLUSTER_NAME: develop-eks-cluster
+  AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION: "1.7.2"
   ISTIO_CHART_VERSION: "1.20.0"
 
 jobs:
@@ -118,6 +119,60 @@ jobs:
       #      color: danger
 
 
+
+
+  # Deploy aws-load-balancer-controller in EKS
+  # https://github.com/kubernetes-sigs/aws-load-balancer-controller/tree/main
+  # https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller
+  aws_load_balancer_controller_deployment:
+    name: "Deploy Istio"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    defaults:
+      run:
+        working-directory: aws-load-balancer-controller
+    needs: [deploy_vpc_and_eks]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
+      # Get from AWS ParameterStore the aws-load-balancer-controller IAM Role that needs to be passed to the values.yaml file, to be linked to the ServiceAccount
+      # The IAM Role was created by Terraform
+      - name: Get IAM Role from ParameterStore
+        id: discover-lb-secgroup
+        run: |
+          iam_role_arn=$(aws ssm get-parameter --name "/$ENVIRONMENT/aws-load-balancer-controller-iam-role-arn" --query 'Parameter.Value' --output text)
+          echo "IAM_ROLE_ARN=$iam_role_arn" >>$GITHUB_ENV
+
+      - name: Customize values file
+        run: |       
+          sed "s|IAM_ROLE_ARN_CHANGEME|$IAM_ROLE_ARN|g" aws-load-ballancer-controller-values.yaml > aws-load-ballancer-controller-values-replaced.yaml
+          sed "s|CLUSTER_NAME_CHANGEME|$EKS_CLUSTER_NAME|g" aws-load-ballancer-controller-values-replaced.yaml > aws-load-ballancer-controller-values-replaced.yaml
+          cat aws-load-ballancer-controller-values-replaced.yaml
+
+      - name: Update kube config
+        run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+
+      # https://istio.io/latest/docs/setup/install/helm/
+      # https://artifacthub.io/packages/helm/istio-official/base
+      # https://artifacthub.io/packages/helm/istio-official/istiod
+      - name: Deploy aws-load-balancer-controller
+        run: |
+          helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
+            --namespace kube-system \
+            --version $AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION \
+            --values aws-load-ballancer-controller-values-replaced.yaml
+
+
+
+
   # Deploy Istio
   istio_deployment:
     name: "Deploy Istio"
@@ -126,7 +181,7 @@ jobs:
     defaults:
       run:
         working-directory: istio
-    needs: [deploy_vpc_and_eks]
+    needs: [deploy_vpc_and_eks, aws_load_balancer_controller_deployment]
     steps:
       - name: Checkout
         uses: actions/checkout@v2
@@ -157,12 +212,22 @@ jobs:
           helm repo add istio https://istio-release.storage.googleapis.com/charts
           helm repo update
           kubectl get namespace | grep -q "^istio-system" || kubectl create namespace istio-system
-          helm upgrade --install istio-base istio/base -n istio-system --set defaultRevision=$ISTIO_CHART_VERSION
-          helm upgrade --install istiod istio/istiod --version $ISTIO_CHART_VERSION -n istio-system --values istiod-values.yaml
+          helm upgrade --install istio-base istio/base \
+            -n istio-system \
+            --set defaultRevision=$ISTIO_CHART_VERSION
+          helm upgrade --install istiod istio/istiod \
+            --version $ISTIO_CHART_VERSION \
+            -n istio-system \
+            --values istio-istiod-values.yaml
       
-      ## https://artifacthub.io/packages/helm/istio-official/gateway
-      #- name: Deploy istio ingress gateway
-      #  run: |
+      # https://artifacthub.io/packages/helm/istio-official/gateway
+      - name: Deploy istio ingress gateway
+        run: |
+          helm upgrade --install istio-ingress istio/gateway \
+            --version $ISTIO_CHART_VERSION \
+            -n istio-ingress \
+            --values istio-ingress-values.yaml
+            
       #    kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
       #    helm upgrade --install istio-ingress istio/gateway --version $ISTIO_CHART_VERSION -n istio-ingress --values ingress-values.yaml
 

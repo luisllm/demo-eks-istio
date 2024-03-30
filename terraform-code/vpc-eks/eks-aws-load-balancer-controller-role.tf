@@ -6,7 +6,8 @@ resource "aws_iam_role" "aws-load-balancer-controller-iam-role" {
   name  = "${local.system_name}-aws-load-balancer-controller-role"
   assume_role_policy = templatefile("templates/oidc_assume_role_policy.json", {
     OIDC_ARN  = module.eks.oidc_provider_arn,
-    OIDC_URL = module.eks.oidc_provider,
+    OIDC_URL  = module.eks.oidc_provider,
+    NAMESPACE = "kube-system"
     SA_NAME   = "aws-load-balancer-controller"
   })
   depends_on = [module.eks.oidc_provider]
@@ -270,3 +271,11 @@ EOF
   depends_on = [aws_iam_role.aws-load-balancer-controller-iam-role]
 }
 
+
+resource "aws_ssm_parameter" "aws-load-balancer-controller-iam-role-arn" {
+  name        = "/${local.system_name}/aws-load-balancer-controller-iam-role-arn"
+  description = "IAM Role to be used by the aws-load-ballancer-controller ServiceAccount"
+  type        = "String"
+  value       = aws_iam_role.aws-load-balancer-controller-iam-role.arn
+  depends_on  = [aws_iam_role.aws-load-balancer-controller-iam-role]
+}
