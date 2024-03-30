@@ -152,8 +152,8 @@ jobs:
 
       - name: Customize values file
         run: |       
-          sed "s|IAM_ROLE_ARN_CHANGEME|$IAM_ROLE_ARN|g" aws-load-ballancer-controller-values.yaml > aws-load-ballancer-controller-values-replaced.yaml
-          sed "s|CLUSTER_NAME_CHANGEME|$EKS_CLUSTER_NAME|g" aws-load-ballancer-controller-values-replaced.yaml > aws-load-ballancer-controller-values-replaced.yaml
+          sed "s|IAM_ROLE_ARN_CHANGEME|$IAM_ROLE_ARN|g" aws-load-ballancer-controller-values.yaml > aws-load-ballancer-controller-values-temp.yaml
+          sed "s|CLUSTER_NAME_CHANGEME|$EKS_CLUSTER_NAME|g" aws-load-ballancer-controller-values-temp.yaml > aws-load-ballancer-controller-values-replaced.yaml
           cat aws-load-ballancer-controller-values-replaced.yaml
 
       - name: Update kube config
