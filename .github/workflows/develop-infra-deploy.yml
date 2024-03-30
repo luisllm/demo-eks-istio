@@ -146,24 +146,30 @@ jobs:
       - name: Update kube config
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
 
-      - name: Create istio namespaces
-        run: |
-          kubectl get namespace | grep -q "^istio-system" || kubectl create namespace istio-system  
-          kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
-
-      - name: Deploy istiod
+      # https://istio.io/latest/docs/setup/install/helm/
+      # https://artifacthub.io/packages/helm/istio-official/base
+      # https://artifacthub.io/packages/helm/istio-official/istiod
+      - name: Deploy istio base and istiod
         run: |
           helm repo add istio https://istio-release.storage.googleapis.com/charts
           helm repo update
-          helm install istio-base istio/base -n istio-system --set defaultRevision=$ISTIO_CHART_VERSION
-          helm install istiod istio/istiod --version $ISTIO_CHART_VERSION -n istio-system --values istiod-values.yaml
-          helm install istio-ingress istio/gateway --version $ISTIO_CHART_VERSION -n istio-ingress
+          kubectl get namespace | grep -q "^istio-system" || kubectl create namespace istio-system
+          helm upgrade --install istio-base istio/base -n istio-system --set defaultRevision=$ISTIO_CHART_VERSION
+          helm upgrade --install istiod istio/istiod --version $ISTIO_CHART_VERSION -n istio-system --values istiod-values.yaml
+      
+      ## https://artifacthub.io/packages/helm/istio-official/gateway
+      #- name: Deploy istio ingress gateway
+      #  run: |
+      #    kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
+      #    helm upgrade --install istio-ingress istio/gateway --version $ISTIO_CHART_VERSION -n istio-ingress --values ingress-values.yaml
 
-          helm upgrade --install public-ingress \
-            oci://ghcr.io/nginxinc/charts/nginx-ingress \
-            --version $NGINX_INGRESS_CONTROLLER_CHART_VERSION \
-            --namespace public-ingress \
-            --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-security-groups"="$SECGROUP_ID"
+
+
+          #helm upgrade --install public-ingress \
+          #  oci://ghcr.io/nginxinc/charts/nginx-ingress \
+          #  --version $NGINX_INGRESS_CONTROLLER_CHART_VERSION \
+          #  --namespace public-ingress \
+          #  --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-security-groups"="$SECGROUP_ID"
 
 
 

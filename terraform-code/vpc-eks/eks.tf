@@ -63,6 +63,7 @@ module "eks" {
     }
   }
 
+  # Additional SecGroup rule in the EKS node SG to allow communication between istiod and k8s API server 
   node_security_group_additional_rules = {
     ingress_nodes_karpenter_port = {
       description                   = "Cluster API to Node group for Istio"
