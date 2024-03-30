@@ -123,9 +123,8 @@ jobs:
 
   # Deploy aws-load-balancer-controller in EKS
   # https://github.com/kubernetes-sigs/aws-load-balancer-controller/tree/main
-  # https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller
   aws_load_balancer_controller_deployment:
-    name: "Deploy Istio"
+    name: "Deploy aws-load-balancer-controller"
     runs-on: ubuntu-latest
     #environment: $ENVIRONMENT
     defaults:
@@ -160,11 +159,10 @@ jobs:
       - name: Update kube config
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
 
-      # https://istio.io/latest/docs/setup/install/helm/
-      # https://artifacthub.io/packages/helm/istio-official/base
-      # https://artifacthub.io/packages/helm/istio-official/istiod
+      # https://artifacthub.io/packages/helm/aws/aws-load-balancer-controller
       - name: Deploy aws-load-balancer-controller
         run: |
+          helm repo add eks https://aws.github.io/eks-charts
           helm upgrade --install aws-load-balancer-controller eks/aws-load-balancer-controller \
             --namespace kube-system \
             --version $AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION \
@@ -227,7 +225,7 @@ jobs:
             --version $ISTIO_CHART_VERSION \
             -n istio-ingress \
             --values istio-ingress-values.yaml
-            
+
       #    kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
       #    helm upgrade --install istio-ingress istio/gateway --version $ISTIO_CHART_VERSION -n istio-ingress --values ingress-values.yaml
 
