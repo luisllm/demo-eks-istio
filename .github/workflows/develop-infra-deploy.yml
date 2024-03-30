@@ -123,6 +123,9 @@ jobs:
     name: "Deploy Istio"
     runs-on: ubuntu-latest
     #environment: $ENVIRONMENT
+    defaults:
+      run:
+        working-directory: istio
     needs: [deploy_vpc_and_eks]
     steps:
       - name: Checkout
