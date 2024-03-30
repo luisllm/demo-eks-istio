@@ -206,8 +206,8 @@ jobs:
 
       - name: Customize values file
         run: |       
-          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" istio-ingress-values.yaml > istio-ingress-values-replaced.yaml
-          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" istio-ingress-values-replaced.yaml > istio-ingress-values-replaced.yaml
+          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" istio-ingress-values.yaml > istio-ingress-values-temp.yaml
+          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" istio-ingress-values-temp.yaml > istio-ingress-values-replaced.yaml
           cat istio-ingress-values-replaced.yaml
 
       - name: Update kube config
