@@ -43,12 +43,29 @@ jobs:
           helm -n istio-system uninstall istio-base
 
 
+  destroy_public_lb_aws_parameterstore:
+    name: "Delete AWS ParameterStore with the public AWS LB dns name"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+      - name: Delete Parameter from AWS Parameter Store
+        run: |
+          aws ssm delete-parameter --name "/$ENVIRONMENT/ingress-public-load-balancer-dns"
+
 
   destroy_eks_and_vpc:
     name: "Delete the EKS cluster and VPC"
     runs-on: ubuntu-latest
     #environment: $ENVIRONMENT
-    needs: [destroy_istio]
+    needs: [destroy_istio, destroy_public_lb_aws_parameterstore]
     defaults:
       run:
         working-directory: terraform-code/vpc-eks
