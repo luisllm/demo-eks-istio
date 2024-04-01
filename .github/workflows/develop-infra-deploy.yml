@@ -313,7 +313,7 @@ jobs:
             tags=$(aws elbv2 describe-tags --resource-arns "$lb_arn" --output json)
             
             # Extract the values of the tags meeting both conditions
-            filtered_tags=$(echo "$tags" | jq -r '.TagDescriptions[].Tags | map(select(.Key == "service.k8s.aws/stack" and .Value == "istio-ingress/public-app-istio-ingress" or .Key == "elbv2.k8s.aws/cluster" and .Value == "$EKS_CLUSTER_NAME"))')
+            filtered_tags=$(echo "$tags" | jq -r --arg EKS_CLUSTER_NAME "$EKS_CLUSTER_NAME" '.TagDescriptions[].Tags | map(select(.Key == "service.k8s.aws/stack" and .Value == "istio-ingress/public-app-istio-ingress" or .Key == "elbv2.k8s.aws/cluster" and .Value == $EKS_CLUSTER_NAME)) | .[].Value')
             echo "$filtered_tags"
 
             # Check if both tags were found
@@ -333,7 +333,7 @@ jobs:
     name: "Tests"
     runs-on: ubuntu-latest
     #environment: $ENVIRONMENT
-    needs: [app_podinfo_deployment]
+    needs: [app_podinfo_deployment, public_ingress_lb_discovery]
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -349,8 +349,8 @@ jobs:
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
 
       # Wait for 1min for the app POD and Istio Ingress Gateway and AWS NLB to start up
-      - name: Wait for 1 Minute
-        run: sleep 60
+      - name: Wait for 30 seconds
+        run: sleep 30
 
       - name: Check all Istio IG and podinfo PODs are running
         run: |
