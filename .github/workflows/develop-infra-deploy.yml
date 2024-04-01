@@ -31,6 +31,7 @@ env:
   EKS_CLUSTER_NAME: develop-eks-cluster
   AWS_LOAD_BALANCER_CONTROLLER_CHART_VERSION: "1.7.2"
   ISTIO_CHART_VERSION: "1.20.0"
+  PODINFO_CHART_VERSION: "6.6.1"
 
 jobs:
   # Deploy the VPC and the EKS cluster
@@ -209,9 +210,6 @@ jobs:
           sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" app-istio-ingress-values.yaml > app-istio-ingress-values-temp.yaml
           sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" app-istio-ingress-values-temp.yaml > app-istio-ingress-values-replaced.yaml
           cat app-istio-ingress-values-replaced.yaml
-          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" argo-istio-ingress-values.yaml > argo-istio-ingress-values-temp.yaml
-          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" argo-istio-ingress-values-temp.yaml > argo-istio-ingress-values-replaced.yaml
-          cat argo-istio-ingress-values-replaced.yaml
 
       - name: Update kube config
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
@@ -242,14 +240,41 @@ jobs:
             -n istio-ingress \
             --values app-istio-ingress-values-replaced.yaml
 
-
-      # https://artifacthub.io/packages/helm/istio-official/gateway
-      - name: Deploy argo istio ingress gateway
-        run: |
-          helm upgrade --install public-argo-istio-ingress istio/gateway \
-            --version $ISTIO_CHART_VERSION \
-            -n istio-ingress \
-            --values argo-istio-ingress-values-replaced.yaml
-
-
     
+
+  # Deploy podinfo
+  app_podinfo_deployment:
+    name: "Deploy podinfo"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    defaults:
+      run:
+        working-directory: app-podinfo
+    needs: [istio_deployment]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v2
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
+      - name: Update kube config
+        run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+      
+      # https://artifacthub.io/packages/helm/podinfo/podinfo
+      - name: Deploy podinfo
+        run: |
+          kubectl get namespace | grep -q "^demo" || kubectl create namespace demo
+          helm upgrade --install podinfo oci://ghcr.io/stefanprodan/charts/podinfo \
+            --version $PODINFO_CHART_VERSION \
+            -n demo
+      
+      - name: Deploy podinfo istio gateway and virtualservice
+        run: |
+          kubectl apply -f podinfo-istio-gateway.yaml
+          kubectl apply -f podinfo-istio-vs.yaml
+          

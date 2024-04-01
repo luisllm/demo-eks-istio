@@ -1,0 +1,21 @@
+apiVersion: networking.istio.io/v1beta1
+kind: VirtualService
+metadata:
+  name: podinfo
+  namespace: demo
+spec:
+  gateways:
+  - podinfo-gateway
+  hosts:
+  - '*'
+  http:
+  - match:
+    - uri:
+        prefix: /podinfo
+    rewrite:
+      uri: "/"
+    route:
+    - destination:
+        host: podinfo
+        port:
+          number: 9898
