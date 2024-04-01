@@ -1,3 +1,6 @@
+meshConfig:
+  accessLogFile: /dev/stdout
+  
 pilot:
   resources:
     requests:
