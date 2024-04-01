@@ -363,17 +363,18 @@ jobs:
           ingress_lb_dns=$(aws ssm get-parameter --name "/$ENVIRONMENT/ingress-public-load-balancer-dns" --query 'Parameter.Value' --output text)
           echo "INGRESS_LB_DNS=$ingress_lb_dns" >>$GITHUB_ENV
 
-      - name: Send test request
-        run: |
-          # Send request
-          response_http_status_code=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
-            --max-time 10 \
-            http://$INGRESS_LB_DNS/podinfo)
-
-          echo "response_http_status: $response_http_status_code"
-          if [ "$response_http_status_code" -eq "200" ]; then
-            echo "OK"
-          else
-            echo "NOK"
-            exit 1
-          fi
+      # TO BE ABLE TO SEND THIS TEST REQUEST FROM A GITHUB ACTION (NOT SELF HOSTED), YOU NEED TO OPEN THE SECGROUP ATTACHED TO THE PUBLIC AWS LB (CIDR DEFINED IN INFRA.TFVARS)
+      #- name: Send test request
+      #  run: |
+      #    # Send request
+      #    response_http_status_code=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+      #      --max-time 10 \
+      #      http://$INGRESS_LB_DNS/podinfo)
+#
+      #    echo "response_http_status: $response_http_status_code"
+      #    if [ "$response_http_status_code" -eq "200" ]; then
+      #      echo "OK"
+      #    else
+      #      echo "NOK"
+      #      exit 1
+      #    fi
