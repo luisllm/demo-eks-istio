@@ -19,3 +19,11 @@ spec:
         host: podinfo
         port:
           number: 9898
+  - match:
+    - uri:
+        prefix: /api/info
+    route:
+    - destination:
+        host: podinfo
+        port:
+          number: 9898

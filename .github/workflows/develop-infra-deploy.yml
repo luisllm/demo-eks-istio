@@ -277,4 +277,103 @@ jobs:
         run: |
           kubectl apply -f podinfo-istio-gateway.yaml
           kubectl apply -f podinfo-istio-vs.yaml
+
+
+
+  # Store in AWS ParameterStore the public LB dns name created automatically when the Istio ingress gateway was deployed. It will be used to send requests
+  public_ingress_lb_discovery:
+    name: "Store ingress AWS public LB dns name in AWS ParameterStore"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    needs: [istio_deployment]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
+      # Wait for 1min for the LB to get created
+      - name: Wait for 1 Minute
+        run: sleep 60
+
+      - name: Discover ingress public LB DNS Name and store it in AWS ParameterStore
+        id: discover-lb-dns
+        run: |
+          # Get the list of load balancer names
+          load_balancer_arns=$(aws elbv2 describe-load-balancers --query "LoadBalancers[].LoadBalancerArn" --output text)
           
+          # Iterate over each load balancer arn
+          for lb_arn in $load_balancer_arns; do
+            # Fetch the tags for the NLB
+            tags=$(aws elbv2 describe-tags --resource-arns "$lb_arn" --output json)
+            
+            # Extract the values of the tags meeting both conditions
+            filtered_tags=$(echo "$tags" | jq -r '.TagDescriptions[].Tags | map(select(.Key == "service.k8s.aws/stack" and .Value == "istio-ingress/public-app-istio-ingress" or .Key == "elbv2.k8s.aws/cluster" and .Value == "$EKS_CLUSTER_NAME"))')
+            echo "$filtered_tags"
+
+            # Check if both tags were found
+            if [ $(echo "$filtered_tags" | wc -l) -eq 2 ]; then
+                # Both tags were found, retrieve the NLB DNS name
+                ingress_lb_dns_name=$(aws elbv2 describe-load-balancers --load-balancer-arns "$lb_arn" --query "LoadBalancers[].DNSName" --output text)
+                echo "NLB DNS Name: $ingress_lb_dns_name"
+                aws ssm put-parameter --name "/$ENVIRONMENT/ingress-public-load-balancer-dns" --value "$ingress_lb_dns_name" --type String --overwrite
+            else
+                # Both tags were not found, do nothing or add error handling
+                echo "Both tags were not found."
+            fi
+          done
+
+
+  tests:
+    name: "Tests"
+    runs-on: ubuntu-latest
+    #environment: $ENVIRONMENT
+    needs: [app_podinfo_deployment]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: "us-east-1"
+
+      - name: Update kube config
+        run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
+
+      # Wait for 1min for the app POD and Istio Ingress Gateway and AWS NLB to start up
+      - name: Wait for 1 Minute
+        run: sleep 60
+
+      - name: Check all Istio IG and podinfo PODs are running
+        run: |
+          kubectl get pods -n istio-ingress -l istio=app-ingressgateway -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}' | grep -qv "Running" && echo "One or more pods are not in running state" && exit 1 || echo "All pods are running"
+          kubectl get pods -n demo -l app.kubernetes.io/name=podinfo -o jsonpath='{range .items[*]}{.status.phase}{"\n"}{end}' | grep -qv "Running" && echo "One or more pods are not in running state" && exit 1 || echo "All pods are running"
+
+      # Get from AWS ParameterStore the public LB dns name created automatically when the Istio Ingress Gateway was deployed. It will be used to send requests
+      - name: Get AWS public LB DNS Name from ParameterStore
+        run: |
+          ingress_lb_dns=$(aws ssm get-parameter --name "/$ENVIRONMENT/ingress-public-load-balancer-dns" --query 'Parameter.Value' --output text)
+          echo "INGRESS_LB_DNS=$ingress_lb_dns" >>$GITHUB_ENV
+
+      - name: Send test request
+        run: |
+          # Send request
+          response_http_status_code=$(curl -s -o /dev/null -w "%{http_code}" -X GET \
+            --max-time 10 \
+            http://$INGRESS_LB_DNS/podinfo)
+
+          echo "response_http_status: $response_http_status_code"
+          if [ "$response_http_status_code" -eq "200" ]; then
+            echo "OK"
+          else
+            echo "NOK"
+            exit 1
+          fi
