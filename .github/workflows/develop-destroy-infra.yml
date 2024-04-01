@@ -38,7 +38,7 @@ jobs:
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
       - name: Destroy Istio
         run: |
-          helm -n istio-ingress uninstall istio-ingress
+          helm -n istio-ingress uninstall public-app-istio-ingress
           helm -n istio-system uninstall istiod
           helm -n istio-system uninstall istio-base
 
