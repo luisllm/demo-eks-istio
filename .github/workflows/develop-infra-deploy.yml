@@ -206,9 +206,12 @@ jobs:
 
       - name: Customize values file
         run: |       
-          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" istio-ingress-values.yaml > istio-ingress-values-temp.yaml
-          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" istio-ingress-values-temp.yaml > istio-ingress-values-replaced.yaml
-          cat istio-ingress-values-replaced.yaml
+          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" app-istio-ingress-values.yaml > app-istio-ingress-values-temp.yaml
+          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" app-istio-ingress-values-temp.yaml > app-istio-ingress-values-replaced.yaml
+          cat app-istio-ingress-values-replaced.yaml
+          sed "s|PUBLIC_SUBNETS_CHANGEME|$PUBLIC_SUBNETS|g" argo-istio-ingress-values.yaml > argo-istio-ingress-values-temp.yaml
+          sed "s|PUBLIC_SG_ID_CHANGEME|$SECGROUP_ID|g" argo-istio-ingress-values-temp.yaml > argo-istio-ingress-values-replaced.yaml
+          cat argo-istio-ingress-values-replaced.yaml
 
       - name: Update kube config
         run: aws eks update-kubeconfig --name $EKS_CLUSTER_NAME
@@ -231,16 +234,22 @@ jobs:
             --values istio-istiod-values.yaml
       
       # https://artifacthub.io/packages/helm/istio-official/gateway
-      - name: Deploy istio ingress gateway
+      - name: Deploy app istio ingress gateway
         run: |
           kubectl get namespace | grep -q "^istio-ingress" || kubectl create namespace istio-ingress
-          helm upgrade --install istio-ingress istio/gateway \
+          helm upgrade --install public-app-istio-ingress istio/gateway \
             --version $ISTIO_CHART_VERSION \
             -n istio-ingress \
-            --values istio-ingress-values-replaced.yaml
+            --values app-istio-ingress-values-replaced.yaml
 
 
-
+      # https://artifacthub.io/packages/helm/istio-official/gateway
+      - name: Deploy argo istio ingress gateway
+        run: |
+          helm upgrade --install public-argo-istio-ingress istio/gateway \
+            --version $ISTIO_CHART_VERSION \
+            -n istio-ingress \
+            --values argo-istio-ingress-values-replaced.yaml
 
 
     

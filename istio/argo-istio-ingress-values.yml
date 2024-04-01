@@ -5,7 +5,7 @@ resources:
 
 service:
   ports:
-    - name: http-ingress
+    - name: http-argo-ingress
       protocol: TCP
       port: 80
       targetPort: 80
@@ -33,5 +33,5 @@ service:
     service.beta.kubernetes.io/aws-load-balancer-manage-backend-security-group-rules: "true"
 
 labels:
-  app: ingressgateway
-  istio: ingressgateway
+  app: argo-ingressgateway
+  istio: argo-ingressgateway
