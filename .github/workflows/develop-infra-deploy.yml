@@ -269,6 +269,7 @@ jobs:
       - name: Deploy podinfo
         run: |
           kubectl get namespace | grep -q "^demo" || kubectl create namespace demo
+          kubectl label ns demo istio-injection=enabled
           helm upgrade --install podinfo oci://ghcr.io/stefanprodan/charts/podinfo \
             --version $PODINFO_CHART_VERSION \
             -n demo
