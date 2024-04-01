@@ -222,6 +222,7 @@ jobs:
           helm repo update
           kubectl get namespace | grep -q "^istio-system" || kubectl create namespace istio-system
           helm upgrade --install istio-base istio/base \
+            --version $ISTIO_CHART_VERSION \
             -n istio-system \
             --set defaultRevision=$ISTIO_CHART_VERSION
           helm upgrade --install istiod istio/istiod \
